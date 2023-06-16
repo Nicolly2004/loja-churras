@@ -2,6 +2,7 @@ package com.academiadesenvolvedor.aplication;
 
 
 
+import com.academiadesenvolvedor.exception.NotFoundException;
 import com.academiadesenvolvedor.models.Cliente;
 import com.academiadesenvolvedor.models.Endereco;
 import com.academiadesenvolvedor.models.Produto;
@@ -19,7 +20,7 @@ public class App {
     public App(Scanner scanner) {
         scan = new Scanner(System.in);
         this.produtos = new ArrayList<>();
-        this.clientes = new ArrayList<>();
+        this.clientes = Cliente.searchCliente("");
     }
 
     public void renderMenuProdutos(){
@@ -38,6 +39,7 @@ public class App {
         System.out.println("2 - Listar Clientes");
         System.out.println("3 - Consultar Clientes");
         System.out.println("4 - Editar Clientes");
+        System.out.println("5 - Consultar Cliente por ID");
         System.out.println("0 - Voltar...");
         System.out.print("Escolha uma opção:");
     }
@@ -93,6 +95,9 @@ public class App {
                 case 4:
                     this.editarCliente();
                     break;
+                case 5:
+                    this.buscarCliente();
+                    break;
                 case 0:
                     System.out.println("Saindo do menu de clientes");
                     sair = true;
@@ -102,6 +107,22 @@ public class App {
             }
         }
     }
+
+    public void buscarCliente(){
+        int clienteID;
+        System.out.println("Informe o ID a ser consultado: ");
+        clienteID = this.scan.nextInt();
+        this.scan.nextLine();
+
+       try{
+           Cliente cliente = Cliente.findCliente(clienteID);
+
+           System.out.println(cliente);
+       }catch (NotFoundException e){
+           System.out.println(e.getMessage());
+       }
+    }
+
     public  void editarCliente(){
         String cpf;
         int indexFound = 0;
@@ -130,6 +151,7 @@ public class App {
 
         cliente.setAtivo(situacao);
         cliente.setCredito(credito);
+        cliente.updateCliente();
         this.clientes.add(indexFound,cliente);
     }
 
@@ -196,8 +218,11 @@ public class App {
 
      Telefone telefone = new Telefone(codigoPais,ddd,numero);
      Endereco endereco = new Endereco(rua,bairro,cep,cidade,uf);
-
-     this.clientes.add(new Cliente(nome,telefone,endereco,cpf,ativo, new ArrayList<>() , credito));
+     Cliente cliente = new Cliente(nome, telefone, endereco, cpf, ativo, credito);
+     this.clientes.add(cliente);
+     System.out.println("Salvando no banco de dados...");
+     Cliente cli = cliente.createCliente();
+     endereco.createEndereco(cli.getId());
      System.out.println("Cliente Cadastrado...");
 
  }

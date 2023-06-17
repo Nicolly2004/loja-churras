@@ -15,6 +15,5 @@ public class Pedido {
     private List<Produto> produto;
     private int quantidade;
 
-
     private double precoTotal;
 }

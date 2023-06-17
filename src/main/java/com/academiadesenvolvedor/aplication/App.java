@@ -6,7 +6,11 @@ import com.academiadesenvolvedor.exception.NotFoundException;
 import com.academiadesenvolvedor.models.Cliente;
 import com.academiadesenvolvedor.models.Endereco;
 import com.academiadesenvolvedor.models.Produto;
+import com.academiadesenvolvedor.persistence.HibernateUtil;
 import com.academiadesenvolvedor.utils.Telefone;
+import  org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,17 +18,26 @@ import java.util.Scanner;
 
 public class App {
     private Scanner scan;
-    private List<Produto> produtos;
-    private List<Cliente> clientes;
+
+
+
+    private SessionFactory sessionFactory ;
+
 
     public App(Scanner scanner) {
         scan = new Scanner(System.in);
-        this.produtos = new ArrayList<>();
-        this.clientes = Cliente.searchCliente("");
+        this.sessionFactory = HibernateUtil.getSessionFactory();
+
     }
 
     public void renderMenuProdutos(){
-        System.out.println("Produtos Cadastrados: "+ this.produtos.size());
+        Session session = this.sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+        Long quantidade = (Long) session.createQuery("SELECT COUNT(p) FROM Produto p").uniqueResult();
+        session.close();
+
+
+        System.out.println("Produtos Cadastrados: "+ quantidade.toString());
         System.out.println("1 - Cadastrar Produto");
         System.out.println("2 - Listar Produtos");
         System.out.println("3 - Consultar Produtos");
@@ -34,7 +47,7 @@ public class App {
     }
 
     public void renderMenuClientes(){
-        System.out.println("Clientes Cadastrados: "+ this.clientes.size());
+        System.out.println("Clientes Cadastrados: "+ Cliente.countClientes());
         System.out.println("1 - Cadastrar Cliente");
         System.out.println("2 - Listar Clientes");
         System.out.println("3 - Consultar Clientes");
@@ -125,17 +138,14 @@ public class App {
 
     public  void editarCliente(){
         String cpf;
-        int indexFound = 0;
         System.out.println("Digite o CPF: ");
         cpf = this.scan.nextLine();
         Cliente cliente = null;
+        List<Cliente> clientes = Cliente.searchCliente("WHERE cpf = " + cpf);
 
-        for(int i =0; i < this.clientes.size(); i++){
-            if(this.clientes.get(i).getCpf().equals(cpf)){
-                cliente = this.clientes.get(i);
-                indexFound = i;
-            }
-        }
+
+        cliente = clientes.get(0);
+
         if(cliente == null){
             System.out.println("Cliente não encontrado!...");
             return;
@@ -152,28 +162,31 @@ public class App {
         cliente.setAtivo(situacao);
         cliente.setCredito(credito);
         cliente.updateCliente();
-        this.clientes.add(indexFound,cliente);
     }
 
     public void consultarCliente(){
         String termo;
-        int encontrados = 0;
+
         System.out.print("Pesquise pelo nome: ");
         termo = this.scan.nextLine();
         Cliente cliente;
 
-        for(int i = 0; i < this.clientes.size(); i++){
-            cliente = this.clientes.get(i);
-            if(cliente.getNome().contains(termo)){
+        List<Cliente> clientes = Cliente.searchCliente("WHERE nome LIKE %"+termo + "%");
+
+
+        for(int i = 0; i < clientes.size(); i++){
+            cliente = clientes.get(i);
+
                 renderCliente(cliente);
-                encontrados++;
             }
-            System.out.println(encontrados + "Clientes foram encontrados");
+            System.out.println(clientes.size() + "Clientes foram encontrados");
         }
-    }
+
     public  void listarClientes(){
-        for(int i = 0; i< this.clientes.size(); i++){
-            Cliente cliente = this.clientes.get(i);
+        List<Cliente> clientes = Cliente.searchCliente("");
+
+        for(int i = 0; i< clientes.size(); i++){
+            Cliente cliente = clientes.get(i);
             this.renderCliente(cliente);
         }
     }
@@ -219,7 +232,6 @@ public class App {
      Telefone telefone = new Telefone(codigoPais,ddd,numero);
      Endereco endereco = new Endereco(rua,bairro,cep,cidade,uf);
      Cliente cliente = new Cliente(nome, telefone, endereco, cpf, ativo, credito);
-     this.clientes.add(cliente);
      System.out.println("Salvando no banco de dados...");
      Cliente cli = cliente.createCliente();
      endereco.createEndereco(cli.getId());
@@ -268,10 +280,12 @@ public class App {
         double preco;
         int qtd;
         Produto produto;
+        Session session = this.sessionFactory.openSession();
 
         System.out.println("Bem-Vindo(a) A tela de cadastro de produtos, fornaça algumas informações para continuar...");
         System.out.print("Nome do Produto: ");
         nome = this.scan.nextLine();
+
 
         System.out.print("Preço do Produto: ");
         preco = this.scan.nextDouble();
@@ -281,22 +295,37 @@ public class App {
         qtd = this.scan.nextInt();
         this.scan.nextLine();
 
+        Transaction transaction = session.beginTransaction();
+        try{
+            produto = new Produto(nome,qtd,preco);
+            session.save(produto);
+            System.out.println("Produto Cadastrado com sucesso!!!");
+            transaction.commit();
+        }catch (Exception e){
+            transaction.rollback();
+        } finally {
+            session.close();
+        }
 
         produto = new Produto(nome, qtd, preco);
-
-        this.produtos.add(produto);
         System.out.println("Produto Cadastrado com Sucesso....");
     }
 
     public  void listarProdutos(){
-        System.out.println("Listando  "+ this.produtos.size() + "produtos");
+        Session session = this.sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+        Long quantidade = (Long) session.createQuery("SELECT COUNT(p) FROM Produto p").uniqueResult();
+
+
+        List<Produto> produtos = session.createQuery("FROM Produto", Produto.class).list();
+        System.out.println("Listando  "+ quantidade.toString() + "produtos");
         Produto produto;
 
-        for (int i = 0; i < this.produtos.size(); i++){
-            produto = this.produtos.get(i);
+        for (int i = 0; i < quantidade; i++){
+            produto = produtos.get(i);
             renderProduto(produto);
         }
-        System.out.println("Listagem de "+this.produtos.size() +" concluída...");
+        System.out.println("Listagem de "+ quantidade.toString() +" concluída...");
     }
 
     private static void renderProduto(Produto produto) {
@@ -308,48 +337,52 @@ public class App {
     }
 
     private void consultarProdutos(){
+
         System.out.println("Consulte Produtos da Lojas...");
         System.out.println("Informe um nome a consultar: ");
         String termo = this.scan.nextLine();
-        Produto produto;
-        int resultados =0;
 
-        for(int i = 0; i < this.produtos.size(); i++){
-            produto = this.produtos.get(i);
 
-            if(produto.getNome().contains(termo)){
-                renderProduto(produto);
-                resultados++;
-            }
-            System.out.println("Foram encontrados "+resultados +" registros para o termo: '"+termo+"'");
+        Session session = this.sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+        List<Produto> produtos = session.createQuery("FROM Produto p WHERE p.nome LIKE: serach")
+                        .setParameter("search","%"+termo+"%")
+                                .getResultList();
+                transaction.commit();
+                for (Produto produto: produtos){
+                    renderProduto(produto);
+                }
+            System.out.println("Foram encontrados "+ produtos.size() +" registros para o termo: '"+termo+"'");
         }
 
-    }
+
     private void apagarProdutos(){
-        System.out.println("Digite o Produto a ser excluído: ");
-        String termo = this.scan.nextLine();
+        System.out.println("Digite o ID Produto a ser excluído: ");
+        int termo = this.scan.nextInt();
+        this.scan.nextLine();
         Produto produto = null;
-        int index = -1;
 
-        for (int i = 0; i < this.produtos.size(); i++ ){
-            if(this.produtos.get(i).getNome().equals(termo)){
-                produto = this.produtos.get(i);
-                index = i;
-            }
-        }
+        Session session = this.sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+        produto = session.get(Produto.class,termo);
+
+
         if(produto != null){
             renderProduto(produto);
             System.out.println("Tem certeza que deseja deletar este produto? [s/n] ");
             String confirm = this.scan.nextLine();
 
             if(confirm.equals("s") || confirm.equals("S")){
-                this.produtos.remove(index);
+                session.delete(produto);
                 System.out.println("Produto deletado...");
+                session.close();
                 return;
             }
             System.out.println("Abortado...");
+            session.close();
             return;
         }
+        session.close();
         System.out.println("Nenhum item corresponde ao termo: '"+termo+"'.");
     }
 }
